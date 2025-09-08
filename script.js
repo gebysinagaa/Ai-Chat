@@ -1,13 +1,11 @@
 /**
- * AI Chat Application
- * Aplikasi chat dengan AI yang mendukung file upload dan analisis gambar
+ * Berviz Assistant Chat Application
+ * Aplikasi chat dengan Berviz Assistant menggunakan API Meta AI
  */
 
-class AIChatApp {
+class BervizAssistant {
     constructor() {
-        this.apiKey = 'sk-jIs2RTjvVgR_WFnutgpAjRTkGdAqleLWaW7eZo1U3wT3BlbkFJ0YU-UsCCDHnlBRtKCtaMw67E-dloPQMNACosFfh0cA';
-        this.isConnected = false;
-        this.currentFile = null;
+        this.apiUrl = 'https://api.siputzx.my.id/api/ai/metaai?query=';
         this.messages = [];
         
         this.initElements();
@@ -19,8 +17,6 @@ class AIChatApp {
      * Inisialisasi elemen-elemen DOM
      */
     initElements() {
-        this.apiKeyInput = document.getElementById('apiKey');
-        this.connectBtn = document.getElementById('connectBtn');
         this.chatContainer = document.getElementById('chatContainer');
         this.messageInput = document.getElementById('messageInput');
         this.sendBtn = document.getElementById('sendBtn');
@@ -34,7 +30,6 @@ class AIChatApp {
      */
     bindEvents() {
         // Button events
-        this.connectBtn.addEventListener('click', () => this.connectAPI());
         this.sendBtn.addEventListener('click', () => this.sendMessage());
         this.fileBtn.addEventListener('click', () => this.fileInput.click());
         this.fileInput.addEventListener('change', (e) => this.handleFileSelect(e));
@@ -48,12 +43,6 @@ class AIChatApp {
         });
 
         this.messageInput.addEventListener('input', () => this.adjustTextareaHeight());
-        
-        this.apiKeyInput.addEventListener('keypress', (e) => {
-            if (e.key === 'Enter') {
-                this.connectAPI();
-            }
-        });
     }
 
     /**
@@ -62,68 +51,6 @@ class AIChatApp {
     adjustTextareaHeight() {
         this.messageInput.style.height = 'auto';
         this.messageInput.style.height = Math.min(this.messageInput.scrollHeight, 120) + 'px';
-    }
-
-    /**
-     * Menghubungkan ke OpenAI API
-     */
-    async connectAPI() {
-        const apiKey = this.apiKeyInput.value.trim();
-        
-        if (!apiKey) {
-            this.showError('Silakan masukkan API Key');
-            return;
-        }
-
-        this.connectBtn.disabled = true;
-        this.connectBtn.textContent = 'MENGHUBUNGKAN...';
-
-        try {
-            // Test API key dengan request ke models endpoint
-            const response = await fetch('https://api.openai.com/v1/models', {
-                headers: {
-                    'Authorization': `Bearer ${apiKey}`
-                }
-            });
-
-            if (response.ok) {
-                this.apiKey = apiKey;
-                this.isConnected = true;
-                this.connectionStatus.textContent = 'TERHUBUNG';
-                this.enableChat();
-                this.clearWelcomeMessage();
-                this.addMessage('ai', 'Halo! Saya AI assistant yang siap membantu Anda. Anda bisa mengirim pesan teks, gambar, atau file untuk saya analisis. Silakan tanya apa saja!');
-            } else {
-                const errorData = await response.json();
-                throw new Error(errorData.error?.message || 'API Key tidak valid');
-            }
-        } catch (error) {
-            this.showError('Gagal terhubung: ' + error.message);
-        } finally {
-            this.connectBtn.disabled = false;
-            this.connectBtn.textContent = 'HUBUNGKAN';
-        }
-    }
-
-    /**
-     * Mengaktifkan interface chat
-     */
-    enableChat() {
-        this.messageInput.disabled = false;
-        this.sendBtn.disabled = false;
-        this.fileBtn.disabled = false;
-        this.messageInput.focus();
-        this.messageInput.placeholder = 'Ketik pesan...';
-    }
-
-    /**
-     * Menghapus pesan welcome
-     */
-    clearWelcomeMessage() {
-        const welcomeMsg = this.chatContainer.querySelector('.welcome-message');
-        if (welcomeMsg) {
-            welcomeMsg.remove();
-        }
     }
 
     /**
@@ -217,7 +144,7 @@ class AIChatApp {
     showTyping() {
         const typingDiv = document.createElement('div');
         typingDiv.className = 'typing';
-        typingDiv.textContent = 'AI sedang mengetik';
+        typingDiv.textContent = 'Berviz Assistant sedang mengetik';
         typingDiv.id = 'typing-indicator';
         this.chatContainer.appendChild(typingDiv);
         this.scrollToBottom();
@@ -248,11 +175,17 @@ class AIChatApp {
             return;
         }
         
-        this.currentFile = file;
-        
         // Show file selection feedback
         const fileName = file.name.length > 25 ? file.name.substring(0, 25) + '...' : file.name;
         this.messageInput.placeholder = `File dipilih: ${fileName} - Ketik pesan atau langsung kirim...`;
+        
+        // Add user message with file
+        const userMessageDiv = this.addMessage('user', 'Mengirim file...');
+        const fileData = await this.getFileAsBase64(file);
+        this.addFilePreview(userMessageDiv, file, fileData);
+        
+        // Send file to API
+        this.sendToBervizAI(null, file);
     }
 
     /**
@@ -273,37 +206,23 @@ class AIChatApp {
      * Mengirim pesan ke chat
      */
     async sendMessage() {
-        if (!this.isConnected) {
-            this.showError('Silakan hubungkan API Key terlebih dahulu');
-            return;
-        }
-
         const message = this.messageInput.value.trim();
-        const file = this.currentFile;
 
-        if (!message && !file) return;
+        if (!message) return;
 
         // Add user message
-        const userMessageDiv = this.addMessage('user', message || 'Menganalisis file...');
+        this.addMessage('user', message);
         
-        // Add file preview if exists
-        if (file) {
-            const fileData = await this.getFileAsBase64(file);
-            this.addFilePreview(userMessageDiv, file, fileData);
-        }
-
         // Clear input
         this.messageInput.value = '';
         this.messageInput.placeholder = 'Ketik pesan...';
-        this.currentFile = null;
-        this.fileInput.value = '';
         this.adjustTextareaHeight();
 
         // Show typing indicator
         const typing = this.showTyping();
 
         try {
-            await this.sendToOpenAI(message, file);
+            await this.sendToBervizAI(message, null);
         } catch (error) {
             this.showError('Terjadi kesalahan: ' + error.message);
         } finally {
@@ -312,123 +231,45 @@ class AIChatApp {
     }
 
     /**
-     * Mengirim request ke OpenAI API
+     * Mengirim request ke Berviz AI API
      * @param {string} message - Pesan text
      * @param {File} file - File yang diupload
      */
-    async sendToOpenAI(message, file) {
-        let messages = [
-            {
-                role: "system",
-                content: "Anda adalah AI assistant yang membantu dalam bahasa Indonesia. Anda dapat menganalisis gambar, file, dan menjawab pertanyaan dengan ramah dan informatif. Berikan jawaban yang detail dan berguna."
-            }
-        ];
-
-        // Add conversation history (last 10 messages for context)
-        const recentMessages = this.messages.slice(-10);
-        messages = messages.concat(recentMessages);
-
-        const userMessage = {
-            role: "user",
-            content: []
-        };
-
-        if (message) {
-            userMessage.content.push({
-                type: "text",
-                text: message
-            });
+    async sendToBervizAI(message, file) {
+        let query = message || 'Analisis file ini';
+        
+        if (file) {
+            // For files, we'll just send a description
+            query += ` (File: ${file.name}, Tipe: ${file.type}, Ukuran: ${this.formatFileSize(file.size)})`;
         }
-
-        if (file && file.type.startsWith('image/')) {
-            const base64Data = await this.getFileAsBase64(file);
-            userMessage.content.push({
-                type: "image_url",
-                image_url: {
-                    url: base64Data,
-                    detail: "high"
+        
+        // Encode query for URL
+        const encodedQuery = encodeURIComponent(query);
+        
+        try {
+            const response = await fetch(`${this.apiUrl}${encodedQuery}`, {
+                method: 'GET',
+                headers: {
+                    'Content-Type': 'application/json'
                 }
             });
-        } else if (file) {
-            // For non-image files, convert to text if possible
-            const fileText = await this.getFileText(file);
-            userMessage.content.push({
-                type: "text",
-                text: `File yang diupload: ${file.name} (${this.formatFileSize(file.size)})\nKonten file: ${fileText}`
-            });
-        }
-
-        messages.push(userMessage);
-
-        const response = await fetch('https://api.openai.com/v1/chat/completions', {
-            method: 'POST',
-            headers: {
-                'Authorization': `Bearer ${this.apiKey}`,
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-                model: "gpt-4o",
-                messages: messages,
-                max_tokens: 1500,
-                temperature: 0.7
-            })
-        });
-
-        if (!response.ok) {
-            const errorData = await response.json();
-            throw new Error(errorData.error?.message || `HTTP Error: ${response.status}`);
-        }
-
-        const data = await response.json();
-        const aiResponse = data.choices[0].message.content;
-        
-        this.addMessage('ai', aiResponse);
-        
-        // Store messages in history
-        this.messages.push(userMessage);
-        this.messages.push({
-            role: "assistant",
-            content: aiResponse
-        });
-
-        // Keep only last 20 messages to manage memory
-        if (this.messages.length > 20) {
-            this.messages = this.messages.slice(-20);
-        }
-    }
-
-    /**
-     * Membaca konten file sebagai text
-     * @param {File} file - File yang akan dibaca
-     * @returns {Promise<string>} - Konten file
-     */
-    async getFileText(file) {
-        try {
-            if (file.type === 'text/plain' || file.name.endsWith('.txt')) {
-                const text = await this.readAsText(file);
-                return text.length > 1000 ? text.substring(0, 1000) + '...' : text;
-            } else if (file.type === 'application/pdf') {
-                return `[File PDF: ${file.name} - Tidak dapat membaca konten PDF secara langsung]`;
-            } else {
-                return `[File: ${file.name} - ${this.formatFileSize(file.size)} - Tipe: ${file.type}]`;
+            
+            if (!response.ok) {
+                throw new Error(`HTTP Error: ${response.status}`);
             }
+            
+            const data = await response.json();
+            
+            // Extract response text from the API response
+            let aiResponse = data.result || data.response || data.answer || 
+                            data.message || 'Tidak dapat memproses respons dari Berviz Assistant';
+            
+            this.addMessage('ai', aiResponse);
+            
         } catch (error) {
-            return `[Tidak dapat membaca file: ${file.name}]`;
+            console.error('Error calling Berviz AI API:', error);
+            this.showError('Terjadi kesalahan saat menghubungi Berviz Assistant: ' + error.message);
         }
-    }
-
-    /**
-     * Membaca file sebagai text
-     * @param {File} file - File yang akan dibaca
-     * @returns {Promise<string>} - Isi file
-     */
-    readAsText(file) {
-        return new Promise((resolve, reject) => {
-            const reader = new FileReader();
-            reader.onload = () => resolve(reader.result);
-            reader.onerror = reject;
-            reader.readAsText(file, 'UTF-8');
-        });
     }
 
     /**
@@ -443,7 +284,7 @@ class AIChatApp {
 
 // Initialize the app when DOM is loaded
 document.addEventListener('DOMContentLoaded', () => {
-    new AIChatApp();
+    new BervizAssistant();
 });
 
 // Prevent form submission on enter
