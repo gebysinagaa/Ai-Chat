@@ -20,8 +20,6 @@ class BervizAssistant {
         this.chatContainer = document.getElementById('chatContainer');
         this.messageInput = document.getElementById('messageInput');
         this.sendBtn = document.getElementById('sendBtn');
-        this.fileBtn = document.getElementById('fileBtn');
-        this.fileInput = document.getElementById('fileInput');
         this.connectionStatus = document.getElementById('connectionStatus');
     }
 
@@ -31,8 +29,6 @@ class BervizAssistant {
     bindEvents() {
         // Button events
         this.sendBtn.addEventListener('click', () => this.sendMessage());
-        this.fileBtn.addEventListener('click', () => this.fileInput.click());
-        this.fileInput.addEventListener('change', (e) => this.handleFileSelect(e));
         
         // Keyboard events
         this.messageInput.addEventListener('keypress', (e) => {
@@ -93,51 +89,6 @@ class BervizAssistant {
     }
 
     /**
-     * Menambahkan preview file ke pesan
-     * @param {HTMLElement} messageDiv - Element pesan
-     * @param {File} file - File yang diupload
-     * @param {string} fileData - Data file dalam format base64
-     */
-    addFilePreview(messageDiv, file, fileData) {
-        const bubble = messageDiv.querySelector('.message-bubble');
-        const preview = document.createElement('div');
-        preview.className = 'file-preview';
-        
-        if (file.type.startsWith('image/')) {
-            const img = document.createElement('img');
-            img.src = fileData;
-            img.alt = file.name;
-            preview.appendChild(img);
-        } else {
-            const fileIcon = document.createElement('div');
-            fileIcon.innerHTML = `📎 ${file.name}`;
-            fileIcon.style.fontSize = '14px';
-            fileIcon.style.marginBottom = '5px';
-            preview.appendChild(fileIcon);
-        }
-        
-        const fileDetails = document.createElement('div');
-        fileDetails.className = 'file-info';
-        fileDetails.textContent = `${file.name} (${this.formatFileSize(file.size)})`;
-        preview.appendChild(fileDetails);
-        
-        bubble.insertBefore(preview, bubble.querySelector('.timestamp'));
-    }
-
-    /**
-     * Format ukuran file
-     * @param {number} bytes - Ukuran dalam bytes
-     * @returns {string} - Ukuran yang diformat
-     */
-    formatFileSize(bytes) {
-        if (bytes === 0) return '0 Bytes';
-        const k = 1024;
-        const sizes = ['Bytes', 'KB', 'MB', 'GB'];
-        const i = Math.floor(Math.log(bytes) / Math.log(k));
-        return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
-    }
-
-    /**
      * Menampilkan indikator typing
      * @returns {HTMLElement} - Element typing indicator
      */
@@ -162,47 +113,6 @@ class BervizAssistant {
     }
 
     /**
-     * Handle pemilihan file
-     * @param {Event} event - Event dari file input
-     */
-    async handleFileSelect(event) {
-        const file = event.target.files[0];
-        if (!file) return;
-        
-        // Check file size (max 20MB)
-        if (file.size > 20 * 1024 * 1024) {
-            this.showError('File terlalu besar. Maksimal 20MB.');
-            return;
-        }
-        
-        // Show file selection feedback
-        const fileName = file.name.length > 25 ? file.name.substring(0, 25) + '...' : file.name;
-        this.messageInput.placeholder = `File dipilih: ${fileName} - Ketik pesan atau langsung kirim...`;
-        
-        // Add user message with file
-        const userMessageDiv = this.addMessage('user', 'Mengirim file...');
-        const fileData = await this.getFileAsBase64(file);
-        this.addFilePreview(userMessageDiv, file, fileData);
-        
-        // Send file to API
-        this.sendToBervizAI(null, file);
-    }
-
-    /**
-     * Mengkonversi file ke base64
-     * @param {File} file - File yang akan dikonversi
-     * @returns {Promise<string>} - Data base64
-     */
-    async getFileAsBase64(file) {
-        return new Promise((resolve, reject) => {
-            const reader = new FileReader();
-            reader.onload = () => resolve(reader.result);
-            reader.onerror = reject;
-            reader.readAsDataURL(file);
-        });
-    }
-
-    /**
      * Mengirim pesan ke chat
      */
     async sendMessage() {
@@ -215,14 +125,13 @@ class BervizAssistant {
         
         // Clear input
         this.messageInput.value = '';
-        this.messageInput.placeholder = 'Ketik pesan...';
         this.adjustTextareaHeight();
 
         // Show typing indicator
         const typing = this.showTyping();
 
         try {
-            await this.sendToBervizAI(message, null);
+            await this.sendToBervizAI(message);
         } catch (error) {
             this.showError('Terjadi kesalahan: ' + error.message);
         } finally {
@@ -233,18 +142,10 @@ class BervizAssistant {
     /**
      * Mengirim request ke Berviz AI API
      * @param {string} message - Pesan text
-     * @param {File} file - File yang diupload
      */
-    async sendToBervizAI(message, file) {
-        let query = message || 'Analisis file ini';
-        
-        if (file) {
-            // For files, we'll just send a description
-            query += ` (File: ${file.name}, Tipe: ${file.type}, Ukuran: ${this.formatFileSize(file.size)})`;
-        }
-        
+    async sendToBervizAI(message) {
         // Encode query for URL
-        const encodedQuery = encodeURIComponent(query);
+        const encodedQuery = encodeURIComponent(message);
         
         try {
             const response = await fetch(`${this.apiUrl}${encodedQuery}`, {
@@ -261,8 +162,9 @@ class BervizAssistant {
             const data = await response.json();
             
             // Extract response text from the API response
-            let aiResponse = data.result || data.response || data.answer || 
-                            data.message || 'Tidak dapat memproses respons dari Berviz Assistant';
+            // Based on the JSON structure from the screenshot
+            let aiResponse = data.data || data.result || data.response || 
+                            data.answer || data.message || 'Tidak dapat memproses respons dari Berviz Assistant';
             
             this.addMessage('ai', aiResponse);
             
