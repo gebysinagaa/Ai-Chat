@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AI Chat Assistant</title>
+    <title>Berviz Assistant</title>
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -11,44 +11,31 @@
         <!-- Header Section -->
         <div class="header">
             <div class="avatar">🤖</div>
-            <h2>AI Chat Assistant</h2>
+            <h2>Berviz Assistant</h2>
             <div class="status">
                 <div class="status-indicator"></div>
-                <span id="connectionStatus">SIAP TERHUBUNG</span>
+                <span id="connectionStatus">TERHUBUNG</span>
             </div>
-        </div>
-
-        <!-- API Key Section -->
-        <div class="api-section">
-            <input 
-                type="password" 
-                id="apiKey" 
-                class="api-input" 
-                placeholder="Masukkan OpenAI API Key..."
-                autocomplete="off"
-            >
-            <button id="connectBtn" class="connect-btn">HUBUNGKAN</button>
         </div>
 
         <!-- Chat Container -->
         <div class="chat-container" id="chatContainer">
             <div class="welcome-message">
-                Selamat datang! Masukkan API Key OpenAI untuk mulai chat dengan AI assistant yang dapat membahas gambar dan file.
+                Halo! Saya Berviz Assistant yang siap membantu Anda. Silakan tanya apa saja!
             </div>
         </div>
 
         <!-- Input Section -->
         <div class="input-section">
             <div class="input-container">
-                <button class="file-btn" id="fileBtn" disabled title="Pilih File">📎</button>
+                <button class="file-btn" id="fileBtn" title="Pilih File">📎</button>
                 <textarea 
                     id="messageInput" 
                     class="message-input" 
                     placeholder="Ketik pesan..." 
                     rows="1"
-                    disabled
                 ></textarea>
-                <button class="send-btn" id="sendBtn" disabled title="Kirim Pesan">➤</button>
+                <button class="send-btn" id="sendBtn" title="Kirim Pesan">➤</button>
             </div>
             <input type="file" id="fileInput" class="file-input" accept="image/*,audio/*,video/*,.pdf,.txt,.doc,.docx">
         </div>
@@ -57,4 +44,4 @@
     <!-- JavaScript -->
     <script src="script.js"></script>
 </body>
-</html>
+            </html>
